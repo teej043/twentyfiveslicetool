@@ -69,6 +69,10 @@ if (keyboard_check_pressed(ord("L"))) {
             sides_height = min(64, sprite_height_val / 3);
             top_bot_width = min(64, sprite_width_val / 3);
             
+            // Initialize handle positions to match their red line positions
+            handle_drag_pos_y = corner_height + sides_height;
+            handle_drag_pos_x = corner_width + top_bot_width;
+            
             // Update input strings
             input_corner_width = string(corner_width);
             input_corner_height = string(corner_height);
@@ -170,44 +174,48 @@ if (loaded_sprite != -1 && !preview_mode) {
         
         if (mx >= 0 && mx <= img_w && my >= 0 && my <= img_h) {
             var grid_tolerance = 8; // Fixed tolerance in world space
+            var handle_tolerance = 12; // Larger tolerance for handles
             
             // Convert mouse to sprite coordinates
             var sprite_mx = mx / image_scale;
             var sprite_my = my / image_scale;
             
-            // Check vertical lines (corner boundaries)
-            if (abs(sprite_mx - corner_width) < grid_tolerance) {
+            // Check for handles first (give them priority)
+            var handle_center_x = sprite_width_val / 2;
+            var handle_center_y = sprite_height_val / 2;
+            
+            // Check for sides height handle
+            if (abs(sprite_mx - handle_center_x) < handle_tolerance && 
+                abs(sprite_my - handle_drag_pos_y) < handle_tolerance) {
                 dragging = true;
-                drag_target = "corner_width_left";
-            } else if (abs(sprite_mx - (sprite_width_val - corner_width)) < grid_tolerance) {
-                dragging = true;
-                drag_target = "corner_width_right";
+                drag_target = "sides_height_top";
             }
-            // Check vertical lines (middle section boundaries)
-            else if (abs(sprite_mx - (corner_width + top_bot_width)) < grid_tolerance) {
+            // Check for top/bot width handle
+            else if (abs(sprite_my - handle_center_y) < handle_tolerance && 
+                    abs(sprite_mx - handle_drag_pos_x) < handle_tolerance) {
                 dragging = true;
                 drag_target = "top_bot_width_left";
-            } else if (abs(sprite_mx - (sprite_width_val - corner_width - top_bot_width)) < grid_tolerance) {
-                dragging = true;
-                drag_target = "top_bot_width_right";
             }
-            
-            // Check horizontal lines (corner boundaries)
-            if (!dragging) {
-                if (abs(sprite_my - corner_height) < grid_tolerance) {
+            // Only check other handles if we didn't hit the special handles
+            else {
+                // Check vertical lines (corner boundaries)
+                if (abs(sprite_mx - corner_width) < grid_tolerance) {
                     dragging = true;
-                    drag_target = "corner_height_top";
-                } else if (abs(sprite_my - (sprite_height_val - corner_height)) < grid_tolerance) {
+                    drag_target = "corner_width_left";
+                } else if (abs(sprite_mx - (sprite_width_val - corner_width)) < grid_tolerance) {
                     dragging = true;
-                    drag_target = "corner_height_bottom";
+                    drag_target = "corner_width_right";
                 }
-                // Check horizontal lines (middle section boundaries)
-                else if (abs(sprite_my - (corner_height + sides_height)) < grid_tolerance) {
-                    dragging = true;
-                    drag_target = "sides_height_top";
-                } else if (abs(sprite_my - (sprite_height_val - corner_height - sides_height)) < grid_tolerance) {
-                    dragging = true;
-                    drag_target = "sides_height_bottom";
+                
+                // Check horizontal lines (corner boundaries)
+                if (!dragging) {
+                    if (abs(sprite_my - corner_height) < grid_tolerance) {
+                        dragging = true;
+                        drag_target = "corner_height_top";
+                    } else if (abs(sprite_my - (sprite_height_val - corner_height)) < grid_tolerance) {
+                        dragging = true;
+                        drag_target = "corner_height_bottom";
+                    }
                 }
             }
         }
@@ -219,75 +227,53 @@ if (loaded_sprite != -1 && !preview_mode) {
         var my = world_mouse_y - image_y;
         var sprite_my = my / image_scale;
         
-        // Handle corner width dragging - keep middle sections in absolute positions
+        // Handle corner width dragging
         if (drag_target == "corner_width_left") {
-            var old_corner_width = corner_width;
             var new_corner_width = clamp(sprite_mx, 1, sprite_width_val / 2 - 1);
-            var corner_change = new_corner_width - old_corner_width;
-            
-            // Adjust top_bot_width to keep middle sections in place
-            top_bot_width = clamp(top_bot_width - corner_change, 1, sprite_width_val - (2 * new_corner_width) - 1);
-            
-            corner_width = new_corner_width;
-            input_corner_width = string(round(corner_width));
-            input_top_bot_width = string(round(top_bot_width));
+            corner_width = floor(new_corner_width);
+            input_corner_width = string(corner_width);
         } else if (drag_target == "corner_width_right") {
-            var old_corner_width = corner_width;
             var new_corner_width = clamp(sprite_width_val - sprite_mx, 1, sprite_width_val / 2 - 1);
-            var corner_change = new_corner_width - old_corner_width;
-            
-            // Adjust top_bot_width to keep middle sections in place
-            top_bot_width = clamp(top_bot_width - corner_change, 1, sprite_width_val - (2 * new_corner_width) - 1);
-            
-            corner_width = new_corner_width;
-            input_corner_width = string(round(corner_width));
-            input_top_bot_width = string(round(top_bot_width));
+            corner_width = floor(new_corner_width);
+            input_corner_width = string(corner_width);
         }
-        // Handle corner height dragging - keep middle sections in absolute positions
+        // Handle corner height dragging
         else if (drag_target == "corner_height_top") {
-            var old_corner_height = corner_height;
             var new_corner_height = clamp(sprite_my, 1, sprite_height_val / 2 - 1);
-            var corner_change = new_corner_height - old_corner_height;
-            
-            // Adjust sides_height to keep middle sections in place
-            sides_height = clamp(sides_height - corner_change, 1, sprite_height_val - (2 * new_corner_height) - 1);
-            
-            corner_height = new_corner_height;
-            input_corner_height = string(round(corner_height));
-            input_sides_height = string(round(sides_height));
+            corner_height = floor(new_corner_height);
+            input_corner_height = string(corner_height);
         } else if (drag_target == "corner_height_bottom") {
-            var old_corner_height = corner_height;
             var new_corner_height = clamp(sprite_height_val - sprite_my, 1, sprite_height_val / 2 - 1);
-            var corner_change = new_corner_height - old_corner_height;
-            
-            // Adjust sides_height to keep middle sections in place
-            sides_height = clamp(sides_height - corner_change, 1, sprite_height_val - (2 * new_corner_height) - 1);
-            
-            corner_height = new_corner_height;
-            input_corner_height = string(round(corner_height));
-            input_sides_height = string(round(sides_height));
+            corner_height = floor(new_corner_height);
+            input_corner_height = string(corner_height);
         }
-        // Handle top/bottom width dragging
-        else if (drag_target == "top_bot_width_left" || drag_target == "top_bot_width_right") {
-            // Just measure the distance between the handles
-            var left_handle_x = corner_width;
-            var right_handle_x = sprite_width_val - corner_width;
-            var handle_distance = right_handle_x - left_handle_x;
+        // Handle top/bot width dragging
+        else if (drag_target == "top_bot_width_left") {
+            // Track handle position for visual dragging
+            var left_corner = corner_width;
+            var right_corner = sprite_width_val - corner_width;
             
-            // Calculate how much of that distance should be the middle section
-            top_bot_width = clamp(handle_distance - sprite_mx, 1, sprite_width_val - (2 * corner_width));
-            input_top_bot_width = string(round(top_bot_width));
+            // Keep track of handle visual position
+            handle_drag_pos_x = clamp(sprite_mx, left_corner, right_corner);
+            
+            // Calculate top_bot_width based on distance from center
+            var sprite_center_x = sprite_width_val / 2;
+            top_bot_width = floor(clamp(abs(sprite_center_x - handle_drag_pos_x) * 2, 1, sprite_width_val - (2 * corner_width) - 2));
+            input_top_bot_width = string(top_bot_width);
         }
         // Handle sides height dragging
-        else if (drag_target == "sides_height_top" || drag_target == "sides_height_bottom") {
-            // Just measure the distance between the handles
-            var top_handle_y = corner_height;
-            var bottom_handle_y = sprite_height_val - corner_height;
-            var handle_distance = bottom_handle_y - top_handle_y;
+        else if (drag_target == "sides_height_top") {
+            // Track handle position for visual dragging
+            var top_corner = corner_height;
+            var bottom_corner = sprite_height_val - corner_height;
             
-            // Calculate how much of that distance should be the middle section
-            sides_height = clamp(handle_distance - sprite_my, 1, sprite_height_val - (2 * corner_height));
-            input_sides_height = string(round(sides_height));
+            // Keep track of handle visual position
+            handle_drag_pos_y = clamp(sprite_my, top_corner, bottom_corner);
+            
+            // Calculate sides height based on distance from center
+            var sprite_center_y = sprite_height_val / 2;
+            sides_height = floor(clamp(abs(sprite_center_y - handle_drag_pos_y) * 2, 1, sprite_height_val - (2 * corner_height) - 2));
+            input_sides_height = string(sides_height);
         }
     }
     
@@ -295,6 +281,28 @@ if (loaded_sprite != -1 && !preview_mode) {
         dragging = false;
         drag_target = "";
     }
+}
+
+// Handle keyboard shortcuts for adjusting dimensions
+if (loaded_sprite != -1) {
+    var shift_mult = keyboard_check(vk_shift) ? 5 : 1;  // Hold shift for larger adjustments
+    var amount = increment_amount * shift_mult;
+    
+    // Corner Width (A/D)
+    if (keyboard_check_pressed(ord("A"))) adjust_corner_width(-amount);
+    if (keyboard_check_pressed(ord("D"))) adjust_corner_width(amount);
+    
+    // Corner Height (W/S)
+    if (keyboard_check_pressed(ord("W"))) adjust_corner_height(-amount);
+    if (keyboard_check_pressed(ord("S"))) adjust_corner_height(amount);
+    
+    // Top/Bot Width (Left/Right arrows)
+    if (keyboard_check_pressed(vk_left)) adjust_top_bot_width(-amount);
+    if (keyboard_check_pressed(vk_right)) adjust_top_bot_width(amount);
+    
+    // Sides Height (Up/Down arrows)
+    if (keyboard_check_pressed(vk_up)) adjust_sides_height(-amount);
+    if (keyboard_check_pressed(vk_down)) adjust_sides_height(amount);
 }
 
 // Generate code
@@ -325,6 +333,11 @@ if (keyboard_check_pressed(ord("T")) && loaded_sprite != -1) {
         preview_x = image_x + sprite_width_val + 50;
         preview_y = image_y;
     }
+}
+
+// Toggle preview debug view
+if (keyboard_check_pressed(ord("D")) && preview_mode) {
+    preview_debug_view = !preview_debug_view;
 }
 
 // Reset view to center on image
